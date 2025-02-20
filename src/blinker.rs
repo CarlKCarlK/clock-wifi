@@ -77,8 +77,6 @@ async fn device_loop(
     let mut text = [' '; CELL_COUNT];
     #[expect(clippy::shadow_unrelated, reason = "false positive. Not shadowing.")]
     loop {
-        (blink_state, text) = blink_state
-            .run_and_next(outer_notifier, &display, text)
-            .await;
+        (blink_state, text) = blink_state.execute(outer_notifier, &display, text).await;
     }
 }

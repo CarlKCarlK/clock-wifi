@@ -33,7 +33,7 @@ async fn inner_main(spawner: Spawner) -> Result<Never> {
     let mut state = ClockState::default();
     loop {
         defmt::info!("State: {:?}", state);
-        state = state.run_and_next(&mut clock, &mut button).await;
+        state = state.execute(&mut clock, &mut button).await;
     }
 }
 

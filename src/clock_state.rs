@@ -31,16 +31,16 @@ impl ClockState {
     /// # Returns
     ///
     /// The next state of the clock.
-    pub async fn run_and_next(self, clock: &mut Clock<'_>, button: &mut Button<'_>) -> Self {
+    pub async fn execute(self, clock: &mut Clock<'_>, button: &mut Button<'_>) -> Self {
         match self {
-            Self::HoursMinutes => self.run_and_next_hours_minutes(clock, button).await,
-            Self::MinutesSeconds => self.run_and_next_minutes_seconds(clock, button).await,
-            Self::ShowSeconds => self.run_and_next_show_seconds(clock, button).await,
-            Self::EditSeconds => self.run_and_next_edit_seconds(clock, button).await,
-            Self::ShowMinutes => self.run_and_next_show_minutes(clock, button).await,
-            Self::EditMinutes => self.run_and_next_edit_minutes(clock, button).await,
-            Self::ShowHours => self.run_and_next_show_hours(clock, button).await,
-            Self::EditHours => self.run_and_next_edit_hours(clock, button).await,
+            Self::HoursMinutes => self.execute_hours_minutes(clock, button).await,
+            Self::MinutesSeconds => self.execute_minutes_seconds(clock, button).await,
+            Self::ShowSeconds => self.execute_show_seconds(clock, button).await,
+            Self::EditSeconds => self.execute_edit_seconds(clock, button).await,
+            Self::ShowMinutes => self.execute_show_minutes(clock, button).await,
+            Self::EditMinutes => self.execute_edit_minutes(clock, button).await,
+            Self::ShowHours => self.execute_show_hours(clock, button).await,
+            Self::EditHours => self.execute_edit_hours(clock, button).await,
         }
     }
 
@@ -65,7 +65,7 @@ impl ClockState {
         }
     }
 
-    async fn run_and_next_hours_minutes(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
+    async fn execute_hours_minutes(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
         clock.set_state(self).await;
         match button.press_duration().await {
             PressDuration::Short => Self::MinutesSeconds,
@@ -73,11 +73,7 @@ impl ClockState {
         }
     }
 
-    async fn run_and_next_minutes_seconds(
-        self,
-        clock: &Clock<'_>,
-        button: &mut Button<'_>,
-    ) -> Self {
+    async fn execute_minutes_seconds(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
         clock.set_state(self).await;
         match button.press_duration().await {
             PressDuration::Short => Self::HoursMinutes,
@@ -85,7 +81,7 @@ impl ClockState {
         }
     }
 
-    async fn run_and_next_show_seconds(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
+    async fn execute_show_seconds(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
         clock.set_state(self).await;
         match button.press_duration().await {
             PressDuration::Short => Self::ShowMinutes,
@@ -93,14 +89,14 @@ impl ClockState {
         }
     }
 
-    async fn run_and_next_edit_seconds(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
+    async fn execute_edit_seconds(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
         clock.set_state(self).await;
         button.wait_for_press().await;
         clock.reset_seconds().await;
         Self::ShowSeconds
     }
 
-    async fn run_and_next_show_minutes(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
+    async fn execute_show_minutes(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
         clock.set_state(self).await;
         match button.press_duration().await {
             PressDuration::Short => Self::ShowHours,
@@ -108,7 +104,7 @@ impl ClockState {
         }
     }
 
-    async fn run_and_next_edit_minutes(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
+    async fn execute_edit_minutes(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
         loop {
             if let Either::Second(_) =
                 select(Timer::after(MINUTE_EDIT_SPEED), button.wait_for_press()).await
@@ -120,7 +116,7 @@ impl ClockState {
         }
     }
 
-    async fn run_and_next_show_hours(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
+    async fn execute_show_hours(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
         clock.set_state(self).await;
         match button.press_duration().await {
             PressDuration::Short => Self::HoursMinutes,
@@ -128,7 +124,7 @@ impl ClockState {
         }
     }
 
-    async fn run_and_next_edit_hours(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
+    async fn execute_edit_hours(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
         loop {
             if let Either::Second(_) =
                 select(Timer::after(HOUR_EDIT_SPEED), button.wait_for_press()).await

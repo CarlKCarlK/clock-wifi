@@ -16,24 +16,24 @@ pub enum BlinkState {
 
 impl BlinkState {
     #[inline]
-    pub async fn run_and_next(
+    pub async fn execute(
         self,
         outer_notifier: &'static BlinkerOuterNotifier,
         display: &Display<'_>,
         text: Text,
     ) -> (Self, Text) {
         match self {
-            Self::Solid => Self::run_and_next_solid(outer_notifier, display, text).await,
+            Self::Solid => Self::execute_solid(outer_notifier, display, text).await,
             Self::BlinkingAndOn => {
-                Self::run_and_next_blinking_and_on(outer_notifier, display, text).await
+                Self::execute_blinking_and_on(outer_notifier, display, text).await
             }
             Self::BlinkingButOff => {
-                Self::run_and_next_blinking_but_off(outer_notifier, display, text).await
+                Self::execute_blinking_but_off(outer_notifier, display, text).await
             }
         }
     }
 
-    async fn run_and_next_solid(
+    async fn execute_solid(
         outer_notifier: &'static BlinkerOuterNotifier,
         display: &Display<'_>,
         text: Text,
@@ -42,7 +42,7 @@ impl BlinkState {
         outer_notifier.wait().await
     }
 
-    async fn run_and_next_blinking_and_on(
+    async fn execute_blinking_and_on(
         outer_notifier: &'static BlinkerOuterNotifier,
         display: &Display<'_>,
         text: Text,
@@ -57,7 +57,7 @@ impl BlinkState {
         }
     }
 
-    async fn run_and_next_blinking_but_off(
+    async fn execute_blinking_but_off(
         outer_notifier: &'static BlinkerOuterNotifier,
         display: &Display<'_>,
         text: Text,
