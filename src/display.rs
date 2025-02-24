@@ -16,7 +16,7 @@ use crate::{BitsToIndexes, CELL_COUNT_U8};
 use error::Result;
 use never::Never;
 
-/// A virtual display that controls a 4-cell (digit), 8-segment LED display.
+/// A display abstraction that controls a 4-cell (digit), 8-segment LED display.
 pub struct Display<'a>(&'a DisplayNotifier);
 /// A notifier that sends messages to the `Display`.
 pub type DisplayNotifier = Signal<CriticalSectionRawMutex, BitMatrix>;

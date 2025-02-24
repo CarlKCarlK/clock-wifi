@@ -5,7 +5,7 @@ use embassy_time::Timer;
 
 use crate::shared_constants::{BUTTON_DEBOUNCE_DELAY, LONG_PRESS_DURATION};
 
-/// A virtual button backed by an Embassy input pin.
+/// A button abstraction backed by an Embassy input pin.
 pub struct Button<'a>(Input<'a>);
 
 impl<'a> Button<'a> {

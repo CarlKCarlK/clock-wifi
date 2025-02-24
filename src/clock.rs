@@ -12,7 +12,7 @@ use crate::{
     ClockState,
 };
 
-/// A struct representing a virtual clock.
+/// A struct representing a clock abstraction.
 pub struct Clock<'a>(&'a ClockOuterNotifier);
 /// Type alias for notifier that sends messages to the `Clock` and the `Blinker` it controls.
 pub type ClockNotifier = (ClockOuterNotifier, BlinkerNotifier);

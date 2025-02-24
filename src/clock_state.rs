@@ -44,7 +44,7 @@ impl ClockState {
         }
     }
 
-    /// Given the current `ClockMode` and `ClockTime`, generates the information the virtual `Clock` should display.
+    /// Given the current `ClockMode` and `ClockTime`, generates the information the `Clock` abstraction should display.
     ///
     /// # Example
     ///
