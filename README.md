@@ -1,5 +1,14 @@
 # Clock
 
+[![Rust Embedded](https://img.shields.io/badge/Rust-Embedded-blue?style=flat-square)](https://www.rust-lang.org/) [![Embassy](https://img.shields.io/badge/Framework-Embassy-orange?style=flat-square)](https://embassy.dev/)
+
+A Rust-based embedded clock controlled with `Embassy`.
+
+## Related Article
+
+**[How Rust & Embassy Shine on Embedded Devices (Part 2): Insights for Everyone and Nine Rules for Embedded Programmers](https://medium.com/@carlmkadie/how-rust-embassy-shine-on-embedded-devices-part-2-aad1adfccf72)**  
+by **Carl M. Kadie & Brad Gibson**, free on Medium.
+
 ![Clock](clock.jpg)
 
 ## State Diagram
