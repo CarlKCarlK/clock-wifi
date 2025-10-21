@@ -51,63 +51,6 @@ async fn inner_main(spawner: Spawner) -> Result<!> {
     }
 }
 
-#[expect(dead_code, reason = "for article")]
-#[expect(clippy::items_after_statements, reason = "Keeps related code together")]
-async fn inner_main_display(spawner: Spawner) -> Result<!> {
-    let hardware = lib::Hardware::default();
 
-
-    // Create TimeSync virtual device (creates WiFi internally)
-    static TIME_SYNC: TimeSyncNotifier = TimeSync::notifier();
-    let _time_sync = TimeSync::new(
-        &TIME_SYNC,
-        hardware.wifi.pin_23,      // WiFi power enable
-        hardware.wifi.pin_25,      // WiFi SPI chip select
-        hardware.wifi.pio0,        // WiFi PIO block for SPI
-        hardware.wifi.pin_24,      // WiFi SPI MOSI
-        hardware.wifi.pin_29,      // WiFi SPI CLK
-        hardware.wifi.dma_ch0,     // WiFi DMA channel for SPI
-        spawner,
-    );
-
-
-    let mut button = Button::new(hardware.button);
-
-    static DISPLAY_NOTIFIER: DisplayNotifier = Display::notifier();
-    let display = Display::new(
-        hardware.cells,
-        hardware.segments,
-        &DISPLAY_NOTIFIER,
-        spawner,
-    )?;
-    loop {
-        display.write_text(['1', '2', '3', '4']);
-        button.press_duration().await;
-        display.write_text(['r', 'u', 's', 't']);
-        button.press_duration().await;
-    }
-}
-
-#[expect(dead_code, reason = "for article")]
-#[expect(clippy::items_after_statements, reason = "Keeps related code together")]
-async fn inner_main_blinky(spawner: Spawner) -> Result<!> {
-    let hardware = lib::Hardware::default();
-    let mut button = Button::new(hardware.button);
-
-    static BLINKER_NOTIFIER: BlinkerNotifier = Blinker::notifier();
-    let blinker = Blinker::new(
-        hardware.cells,
-        hardware.segments,
-        &BLINKER_NOTIFIER,
-        spawner,
-    )?;
-
-    loop {
-        blinker.write_text(BlinkState::Solid, ['1', '2', '3', '4']);
-        button.press_duration().await;
-        blinker.write_text(BlinkState::BlinkingAndOn, ['r', 'u', 's', 't']);
-        button.press_duration().await;
-    }
-}
 
 // TODO: Is testing possible?
