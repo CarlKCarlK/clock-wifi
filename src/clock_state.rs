@@ -144,26 +144,17 @@ impl ClockState {
     }
 
     fn render_edit_utc_offset(clock_time: &ClockTime) -> (BlinkState, [char; 4], Duration) {
-        let offset_hours = clock_time.utc_offset_hours();
-        let is_negative = offset_hours < 0;
-        let abs_hours = offset_hours.unsigned_abs();
-
-        // Display format: "±HH " (e.g., "+08 ", "-05 ", " 00 ")
-        let sign_char = if is_negative {
-            '-'
-        } else if offset_hours > 0 {
-            '+'
-        } else {
-            ' '
-        };
-
+        // Display the current time in HH:MM format while blinking
+        // This shows what the time looks like with the current UTC offset
+        let (hours, minutes, _, _) = clock_time.h_m_s_sleep_duration(ONE_MINUTE);
+        
         (
             BlinkState::BlinkingAndOn,
             [
-                sign_char,
-                tens_digit(abs_hours as u8),
-                ones_digit(abs_hours as u8),
-                ' ',
+                tens_hours(hours),
+                ones_digit(hours),
+                tens_digit(minutes),
+                ones_digit(minutes),
             ],
             Duration::from_millis(500), // Blink at 1Hz
         )
