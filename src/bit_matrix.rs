@@ -67,7 +67,7 @@ impl BitMatrix {
                     vec.push(index).map_err(|_| BitsToIndexesNotEnoughSpace)?;
                 } else {
                     let vec =
-                        Vec::from_slice(&[index]).map_err(|()| BitsToIndexesNotEnoughSpace)?;
+                        Vec::from_slice(&[index]).map_err(|_| BitsToIndexesNotEnoughSpace)?;
                     bits_to_index
                         .insert(nonzero_bits, vec)
                         .map_err(|_| BitsToIndexesNotEnoughSpace)?;
