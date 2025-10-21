@@ -9,27 +9,61 @@ use crate::TICKS_IN_ONE_DAY;
 /// to display on the clock.
 pub struct ClockTime {
     offset: Duration,
+    /// UTC offset in minutes
+    utc_offset_minutes: i32,
 }
 
 impl Default for ClockTime {
-    /// By default, `ClockTime` is born holding the time of the last build. If
-    /// the build time is not available, it starts at Midnight.
-    ///
-    /// The build time is set by the `build.rs` script which sets the `BUILD_TIME`
-    /// environment variable to the number of milliseconds since the Unix epoch.
+    /// By default, `ClockTime` starts at 12:00:00.
     fn default() -> Self {
-        let build_time_millis = option_env!("BUILD_TIME")
-            .and_then(|val| val.parse::<u64>().ok())
-            .unwrap_or(0);
         info!("Now: {:?}", Instant::now());
-        // Convert build time (Unix epoch) to an offset Duration
+        // Start at 12:00:00 (12 hours * 3600 seconds/hour * 1000 milliseconds/second)
+        let utc_offset_minutes = option_env!("UTC_OFFSET_MINUTES")
+            .and_then(|val| val.parse::<i32>().ok())
+            .unwrap_or(0);
         Self {
-            offset: Duration::from_millis(build_time_millis),
+            offset: Duration::from_millis(12 * 3600 * 1000),
+            utc_offset_minutes,
         }
     }
 }
 
 impl ClockTime {
+    /// Sets the time from a Unix timestamp with UTC offset applied.
+    ///
+    /// Uses the current UTC offset stored in the struct.
+    #[expect(
+        clippy::integer_division_remainder_used,
+        clippy::arithmetic_side_effects,
+        reason = "The modulo operations prevent overflow."
+    )]
+    pub fn set_from_unix(&mut self, unix_seconds: crate::UnixSeconds) {
+        // Convert to local time
+        let local_seconds = unix_seconds.as_i64() + i64::from(self.utc_offset_minutes) * 60;
+        
+        // Get seconds since local midnight
+        let seconds_since_midnight = (local_seconds % 86400) as u64;
+        let millis_since_midnight = seconds_since_midnight * 1000;
+        
+        // Calculate offset needed to make now() return the target time
+        let current_instant_ticks = Instant::now().as_ticks() % TICKS_IN_ONE_DAY;
+        let target_ticks = Duration::from_millis(millis_since_midnight).as_ticks() % TICKS_IN_ONE_DAY;
+        
+        // offset = target - instant (mod 1 day)
+        let offset_ticks = if target_ticks >= current_instant_ticks {
+            target_ticks - current_instant_ticks
+        } else {
+            TICKS_IN_ONE_DAY + target_ticks - current_instant_ticks
+        };
+        
+        self.offset = Duration::from_ticks(offset_ticks % TICKS_IN_ONE_DAY);
+        info!(
+            "Set time from Unix: {} -> offset: {:?}",
+            unix_seconds.as_i64(),
+            self.offset.as_millis()
+        );
+    }
+
     /// Returns the current time with the offset applied wrapped around to be less than one day.
     #[expect(
         clippy::arithmetic_side_effects,
@@ -84,6 +118,36 @@ impl ClockTime {
     pub const fn till_next(time: Duration, unit: Duration) -> Duration {
         let unit_ticks = unit.as_ticks();
         Duration::from_ticks(unit_ticks - time.as_ticks() % unit_ticks)
+    }
+
+    /// Returns the current UTC offset in hours (rounded to nearest hour).
+    #[expect(
+        clippy::integer_division_remainder_used,
+        reason = "Division is intentional for converting minutes to hours."
+    )]
+    #[must_use]
+    pub fn utc_offset_hours(&self) -> i32 {
+        // Round to nearest hour
+        if self.utc_offset_minutes >= 0 {
+            (self.utc_offset_minutes + 30) / 60
+        } else {
+            (self.utc_offset_minutes - 30) / 60
+        }
+    }
+
+    /// Adjusts the UTC offset by the given number of hours.
+    /// The offset is clamped to the range -12 to +14 hours.
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "Clamping prevents overflow."
+    )]
+    pub fn adjust_utc_offset_hours(&mut self, hours: i32) {
+        let new_offset_hours = (self.utc_offset_hours() + hours).clamp(-12, 14);
+        self.utc_offset_minutes = new_offset_hours * 60;
+        info!(
+            "Adjusted UTC offset to {} hours ({} minutes)",
+            new_offset_hours, self.utc_offset_minutes
+        );
     }
 }
 

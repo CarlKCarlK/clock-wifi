@@ -7,8 +7,6 @@
 
 use std::{env, fs::File, io::Write, path::PathBuf};
 
-use chrono::{Local, Timelike};
-
 fn main() -> Result<(), Box<dyn core::error::Error>> {
     // Put `memory.x` in our output directory and ensure it's on the linker search path.
     let out =
@@ -21,17 +19,6 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
 
     println!("cargo:rerun-if-changed=build.rs"); // Re-run if this file changes
     println!("cargo:rerun-if-changed=*"); // Re-run if any file in the project changes
-
-    // Put the current millis since the Epoch into an environment variable
-    let now = Local::now();
-    // Calculate the time since local midnight
-    #[expect(clippy::arithmetic_side_effects, reason = "Will never overflow")]
-    let millis_since_midnight = u64::from(now.hour()) * 60 * 60 * 1000  // Hours to milliseconds
-        + u64::from(now.minute()) * 60 * 1000                          // Minutes to milliseconds
-        + u64::from(now.second()) * 1000                              // Seconds to milliseconds
-        + u64::from(now.timestamp_subsec_millis()) // Milliseconds
-        + 4000; // Add 4 seconds to the time to allow for the build process
-    println!("cargo:rustc-env=BUILD_TIME={millis_since_midnight}");
 
     // WiFi credentials and timezone configuration
     // 1) Try project-local .env (ignored by git)

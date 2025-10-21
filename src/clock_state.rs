@@ -1,28 +1,24 @@
 use crate::{
     button::{Button, PressDuration},
     clock::Clock,
-    shared_constants::{HOUR_EDIT_SPEED, MINUTE_EDIT_SPEED, ONE_HOUR, ONE_MINUTE},
-    BlinkState, ClockTime, ONE_DAY, ONE_SECOND,
+    time_sync::{TimeSync, TimeSyncEvent},
+    BlinkState, ClockTime, ONE_MINUTE, ONE_SECOND,
 };
+use defmt::info;
 use embassy_futures::select::{select, Either};
-use embassy_time::{Duration, Timer};
+use embassy_time::Duration;
 
 /// Represents the different states the clock can operate in.
 ///
-/// For example, `HoursMinutes` displays the hours and minutes and `ShowSeconds` blinks the seconds
-/// to show that they are ready to be reset.
+/// The clock has two display modes: `HoursMinutes` (HH:MM) and `MinutesSeconds` (MM:SS).
+/// Short press toggles between them. Long press enters UTC offset edit mode.
 #[expect(missing_docs, reason = "The variants are self-explanatory.")]
 #[derive(Debug, defmt::Format, Clone, Copy, Default)]
 pub enum ClockState {
     #[default]
     HoursMinutes,
     MinutesSeconds,
-    ShowSeconds,
-    EditSeconds,
-    ShowMinutes,
-    EditMinutes,
-    ShowHours,
-    EditHours,
+    EditUtcOffset,
 }
 
 impl ClockState {
@@ -31,16 +27,16 @@ impl ClockState {
     /// # Returns
     ///
     /// The next state of the clock.
-    pub async fn execute(self, clock: &mut Clock<'_>, button: &mut Button<'_>) -> Self {
+    pub async fn execute(
+        self,
+        clock: &mut Clock<'_>,
+        button: &mut Button<'_>,
+        time_sync: &TimeSync,
+    ) -> Self {
         match self {
-            Self::HoursMinutes => self.execute_hours_minutes(clock, button).await,
-            Self::MinutesSeconds => self.execute_minutes_seconds(clock, button).await,
-            Self::ShowSeconds => self.execute_show_seconds(clock, button).await,
-            Self::EditSeconds => self.execute_edit_seconds(clock, button).await,
-            Self::ShowMinutes => self.execute_show_minutes(clock, button).await,
-            Self::EditMinutes => self.execute_edit_minutes(clock, button).await,
-            Self::ShowHours => self.execute_show_hours(clock, button).await,
-            Self::EditHours => self.execute_edit_hours(clock, button).await,
+            Self::HoursMinutes => self.execute_hours_minutes(clock, button, time_sync).await,
+            Self::MinutesSeconds => self.execute_minutes_seconds(clock, button, time_sync).await,
+            Self::EditUtcOffset => self.execute_edit_utc_offset(clock, button).await,
         }
     }
 
@@ -56,83 +52,66 @@ impl ClockState {
         match self {
             Self::HoursMinutes => Self::render_hours_minutes(clock_time),
             Self::MinutesSeconds => Self::render_minutes_seconds(clock_time),
-            Self::ShowSeconds => Self::render_show_seconds(clock_time),
-            Self::EditSeconds => Self::render_edit_seconds(clock_time),
-            Self::ShowMinutes => Self::render_show_minutes(clock_time),
-            Self::EditMinutes => Self::render_edit_minutes(clock_time),
-            Self::ShowHours => Self::render_show_hours(clock_time),
-            Self::EditHours => Self::render_edit_hours(clock_time),
+            Self::EditUtcOffset => Self::render_edit_utc_offset(clock_time),
         }
     }
 
-    async fn execute_hours_minutes(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
+    async fn execute_hours_minutes(
+        self,
+        clock: &Clock<'_>,
+        button: &mut Button<'_>,
+        time_sync: &TimeSync,
+    ) -> Self {
         clock.set_state(self).await;
-        match button.press_duration().await {
-            PressDuration::Short => Self::MinutesSeconds,
-            PressDuration::Long => Self::ShowSeconds,
-        }
-    }
-
-    async fn execute_minutes_seconds(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
-        clock.set_state(self).await;
-        match button.press_duration().await {
-            PressDuration::Short => Self::HoursMinutes,
-            PressDuration::Long => Self::ShowSeconds,
-        }
-    }
-
-    async fn execute_show_seconds(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
-        clock.set_state(self).await;
-        match button.press_duration().await {
-            PressDuration::Short => Self::ShowMinutes,
-            PressDuration::Long => Self::EditSeconds,
-        }
-    }
-
-    async fn execute_edit_seconds(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
-        clock.set_state(self).await;
-        button.wait_for_press().await;
-        clock.reset_seconds().await;
-        Self::ShowSeconds
-    }
-
-    async fn execute_show_minutes(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
-        clock.set_state(self).await;
-        match button.press_duration().await {
-            PressDuration::Short => Self::ShowHours,
-            PressDuration::Long => Self::EditMinutes,
-        }
-    }
-
-    async fn execute_edit_minutes(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
-        loop {
-            if let Either::Second(_) =
-                select(Timer::after(MINUTE_EDIT_SPEED), button.wait_for_press()).await
-            {
-                return Self::ShowMinutes;
+        match select(button.press_duration(), time_sync.wait()).await {
+            Either::First(PressDuration::Short) => Self::MinutesSeconds,
+            Either::First(PressDuration::Long) => Self::EditUtcOffset,
+            Either::Second(event) => {
+                Self::handle_time_sync_event(clock, event).await;
+                self
             }
-            clock.adjust_offset(ONE_MINUTE).await;
-            clock.set_state(self).await;
         }
     }
 
-    async fn execute_show_hours(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
+    async fn execute_minutes_seconds(
+        self,
+        clock: &Clock<'_>,
+        button: &mut Button<'_>,
+        time_sync: &TimeSync,
+    ) -> Self {
+        clock.set_state(self).await;
+        match select(button.press_duration(), time_sync.wait()).await {
+            Either::First(PressDuration::Short) => Self::HoursMinutes,
+            Either::First(PressDuration::Long) => Self::EditUtcOffset,
+            Either::Second(event) => {
+                Self::handle_time_sync_event(clock, event).await;
+                self
+            }
+        }
+    }
+
+    async fn execute_edit_utc_offset(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
         clock.set_state(self).await;
         match button.press_duration().await {
-            PressDuration::Short => Self::HoursMinutes,
-            PressDuration::Long => Self::EditHours,
+            PressDuration::Short => {
+                // Advance UTC offset by 1 hour
+                clock.adjust_utc_offset_hours(1).await;
+                clock.set_state(self).await;
+                self
+            }
+            PressDuration::Long => Self::HoursMinutes,
         }
     }
 
-    async fn execute_edit_hours(self, clock: &Clock<'_>, button: &mut Button<'_>) -> Self {
-        loop {
-            if let Either::Second(_) =
-                select(Timer::after(HOUR_EDIT_SPEED), button.wait_for_press()).await
-            {
-                return Self::ShowHours;
+    async fn handle_time_sync_event(clock: &Clock<'_>, event: TimeSyncEvent) {
+        match event {
+            TimeSyncEvent::Success { unix_seconds } => {
+                info!("Time sync success: setting clock to {}", unix_seconds.as_i64());
+                clock.set_time_from_unix(unix_seconds).await;
             }
-            clock.adjust_offset(ONE_HOUR).await;
-            clock.set_state(self).await;
+            TimeSyncEvent::Failed(msg) => {
+                info!("Time sync failed: {}", msg);
+            }
         }
     }
 
@@ -164,55 +143,29 @@ impl ClockState {
         )
     }
 
-    fn render_show_seconds(clock_time: &ClockTime) -> (BlinkState, [char; 4], Duration) {
-        let (_, _, seconds, sleep_duration) = clock_time.h_m_s_sleep_duration(ONE_SECOND);
+    fn render_edit_utc_offset(clock_time: &ClockTime) -> (BlinkState, [char; 4], Duration) {
+        let offset_hours = clock_time.utc_offset_hours();
+        let is_negative = offset_hours < 0;
+        let abs_hours = offset_hours.unsigned_abs();
+
+        // Display format: "±HH " (e.g., "+08 ", "-05 ", " 00 ")
+        let sign_char = if is_negative {
+            '-'
+        } else if offset_hours > 0 {
+            '+'
+        } else {
+            ' '
+        };
+
         (
             BlinkState::BlinkingAndOn,
-            [' ', tens_digit(seconds), ones_digit(seconds), ' '],
-            sleep_duration,
-        )
-    }
-
-    const fn render_edit_seconds(_clock_time: &ClockTime) -> (BlinkState, [char; 4], Duration) {
-        // We don't really need to wake up even once a day to update
-        // the constant "00" display, but Duration::MAX causes an overflow
-        // so ONE_DAY is used instead.
-        (BlinkState::Solid, [' ', '0', '0', ' '], ONE_DAY)
-    }
-
-    fn render_show_minutes(clock_time: &ClockTime) -> (BlinkState, [char; 4], Duration) {
-        let (_, minutes, _, sleep_duration) = clock_time.h_m_s_sleep_duration(ONE_MINUTE);
-        (
-            BlinkState::BlinkingAndOn,
-            [' ', ' ', tens_digit(minutes), ones_digit(minutes)],
-            sleep_duration,
-        )
-    }
-
-    fn render_edit_minutes(clock_time: &ClockTime) -> (BlinkState, [char; 4], Duration) {
-        let (_, minutes, _, sleep_duration) = clock_time.h_m_s_sleep_duration(ONE_MINUTE);
-        (
-            BlinkState::Solid,
-            [' ', ' ', tens_digit(minutes), ones_digit(minutes)],
-            sleep_duration,
-        )
-    }
-
-    fn render_show_hours(clock_time: &ClockTime) -> (BlinkState, [char; 4], Duration) {
-        let (hours, _, _, sleep_duration) = clock_time.h_m_s_sleep_duration(ONE_HOUR);
-        (
-            BlinkState::BlinkingAndOn,
-            [tens_hours(hours), ones_digit(hours), ' ', ' '],
-            sleep_duration,
-        )
-    }
-
-    fn render_edit_hours(clock_time: &ClockTime) -> (BlinkState, [char; 4], Duration) {
-        let (hours, _, _, sleep_duration) = clock_time.h_m_s_sleep_duration(ONE_HOUR);
-        (
-            BlinkState::Solid,
-            [tens_hours(hours), ones_digit(hours), ' ', ' '],
-            sleep_duration,
+            [
+                sign_char,
+                tens_digit(abs_hours as u8),
+                ones_digit(abs_hours as u8),
+                ' ',
+            ],
+            Duration::from_millis(500), // Blink at 1Hz
         )
     }
 }

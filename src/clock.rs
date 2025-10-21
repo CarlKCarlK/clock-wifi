@@ -71,6 +71,10 @@ impl Clock<'_> {
         self.0.send(ClockNotice::SetState(clock_state)).await;
     }
 
+    pub(crate) async fn set_time_from_unix(&self, unix_seconds: crate::UnixSeconds) {
+        self.0.send(ClockNotice::SetTimeFromUnix(unix_seconds)).await;
+    }
+
     pub(crate) async fn adjust_offset(&self, delta: Duration) {
         self.0.send(ClockNotice::AdjustClockTime(delta)).await;
     }
@@ -78,12 +82,18 @@ impl Clock<'_> {
     pub(crate) async fn reset_seconds(&self) {
         self.0.send(ClockNotice::ResetSeconds).await;
     }
+
+    pub(crate) async fn adjust_utc_offset_hours(&self, hours: i32) {
+        self.0.send(ClockNotice::AdjustUtcOffsetHours(hours)).await;
+    }
 }
 
 pub enum ClockNotice {
     SetState(ClockState),
+    SetTimeFromUnix(crate::UnixSeconds),
     AdjustClockTime(Duration),
     ResetSeconds,
+    AdjustUtcOffsetHours(i32),
 }
 
 impl ClockNotice {
@@ -94,6 +104,9 @@ impl ClockNotice {
     /// Handles the action associated with the given `ClockNotice`.
     pub(crate) fn apply(self, clock_time: &mut ClockTime, clock_state: &mut ClockState) {
         match self {
+            Self::SetTimeFromUnix(unix_seconds) => {
+                clock_time.set_from_unix(unix_seconds);
+            }
             Self::AdjustClockTime(delta) => {
                 *clock_time += delta;
             }
@@ -103,6 +116,9 @@ impl ClockNotice {
             Self::ResetSeconds => {
                 let sleep_duration = ClockTime::till_next(clock_time.now(), ONE_MINUTE);
                 *clock_time += sleep_duration;
+            }
+            Self::AdjustUtcOffsetHours(hours) => {
+                clock_time.adjust_utc_offset_hours(hours);
             }
         }
     }

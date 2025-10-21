@@ -9,8 +9,7 @@ use defmt::info;
 use defmt_rtt as _;
 use embassy_executor::Spawner;
 use lib::{
-    BlinkState, Blinker, BlinkerNotifier, Button, Clock, ClockNotifier, ClockState, Display,
-    DisplayNotifier, Result, TimeSync, TimeSyncNotifier,
+    Button, Clock, ClockNotifier, ClockState, Result, TimeSync, TimeSyncNotifier,
 }; // This crate's own internal library
 use panic_probe as _;
 
@@ -25,9 +24,9 @@ pub async fn main(spawner0: Spawner) -> ! {
 async fn inner_main(spawner: Spawner) -> Result<!> {
     let hardware = lib::Hardware::default();
 
-    // Create TimeSync virtual device (creates WiFi internally) - not used yet
+    // Create TimeSync virtual device (creates WiFi internally)
     static TIME_SYNC: TimeSyncNotifier = TimeSync::notifier();
-    let _time_sync = TimeSync::new(
+    let time_sync = TimeSync::new(
         &TIME_SYNC,
         hardware.wifi.pin_23,
         hardware.wifi.pin_25,
@@ -47,7 +46,7 @@ async fn inner_main(spawner: Spawner) -> Result<!> {
     let mut state = ClockState::default();
     loop {
         defmt::info!("State: {:?}", state);
-        state = state.execute(&mut clock, &mut button).await;
+        state = state.execute(&mut clock, &mut button, time_sync).await;
     }
 }
 
