@@ -8,13 +8,12 @@ use embassy_time::Timer;
 use crate::blinker::Text;
 use crate::{
     bit_matrix::BitMatrix,
-    error, never,
+    error,
     output_array::OutputArray,
     shared_constants::{CELL_COUNT, MULTIPLEX_SLEEP, SEGMENT_COUNT},
 };
 use crate::{BitsToIndexes, CELL_COUNT_U8};
 use error::Result;
-use never::Never;
 
 /// A display abstraction that controls a 4-cell (digit), 8-segment LED display.
 pub struct Display<'a>(&'a DisplayNotifier);
@@ -82,7 +81,7 @@ async fn simple_inner_device_loop(
     mut cell_pins: OutputArray<'static, CELL_COUNT>,
     mut segment_pins: OutputArray<'static, SEGMENT_COUNT>,
     notifier: &'static DisplayNotifier,
-) -> Result<Never> {
+) -> Result<!> {
     let mut bit_matrix: BitMatrix = BitMatrix::default();
     'outer: loop {
         info!("bit_matrix: {:?}", bit_matrix);
@@ -105,7 +104,7 @@ async fn inner_device_loop(
     mut cell_pins: OutputArray<'static, CELL_COUNT>,
     mut segment_pins: OutputArray<'static, SEGMENT_COUNT>,
     notifier: &'static DisplayNotifier,
-) -> Result<Never> {
+) -> Result<!> {
     let mut bit_matrix: BitMatrix = BitMatrix::default();
     let mut bits_to_indexes = BitsToIndexes::default();
     'outer: loop {

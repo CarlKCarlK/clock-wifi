@@ -1,9 +1,20 @@
 use embassy_rp::{
     gpio::{self, Level},
+    peripherals::{DMA_CH0, PIN_23, PIN_24, PIN_25, PIN_29, PIO0},
     Peri,
 };
 
 use crate::{output_array::OutputArray, CELL_COUNT, SEGMENT_COUNT};
+
+/// WiFi hardware peripherals
+pub struct WifiHardware {
+    pub pin_23: Peri<'static, PIN_23>,  // WiFi power enable
+    pub pin_25: Peri<'static, PIN_25>,  // WiFi SPI chip select
+    pub pio0: Peri<'static, PIO0>,      // WiFi PIO block for SPI
+    pub pin_24: Peri<'static, PIN_24>,  // WiFi SPI MOSI
+    pub pin_29: Peri<'static, PIN_29>,  // WiFi SPI CLK
+    pub dma_ch0: Peri<'static, DMA_CH0>, // WiFi DMA channel for SPI
+}
 
 /// Represents the hardware components of the clock.
 pub struct Hardware {
@@ -16,14 +27,16 @@ pub struct Hardware {
     pub button: gpio::Input<'static>,
     /// An LED (not currently used).
     pub led: gpio::Output<'static>,
-    /// The second core of the RP2040 (not currently used).
-    pub core1: Peri<'static, embassy_rp::peripherals::CORE1>,
+    /// WiFi hardware peripherals
+    pub wifi: WifiHardware,
 }
 
 impl Default for Hardware {
     fn default() -> Self {
         let peripherals: embassy_rp::Peripherals =
             embassy_rp::init(embassy_rp::config::Config::default());
+
+        let led = gpio::Output::new(peripherals.PIN_0, Level::Low);
 
         let cells = OutputArray::new([
             gpio::Output::new(peripherals.PIN_1, Level::High),
@@ -45,16 +58,21 @@ impl Default for Hardware {
 
         let button = gpio::Input::new(peripherals.PIN_13, gpio::Pull::Down);
 
-        let led = gpio::Output::new(peripherals.PIN_0, Level::Low);
-
-        let core1 = peripherals.CORE1;
+        let wifi = WifiHardware {
+            pin_23: peripherals.PIN_23,
+            pin_25: peripherals.PIN_25,
+            pio0: peripherals.PIO0,
+            pin_24: peripherals.PIN_24,
+            pin_29: peripherals.PIN_29,
+            dma_ch0: peripherals.DMA_CH0,
+        };
 
         Self {
             cells,
             segments,
             button,
             led,
-            core1,
+            wifi,
         }
     }
 }
