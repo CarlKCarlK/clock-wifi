@@ -136,17 +136,35 @@ impl ClockTime {
     }
 
     /// Adjusts the UTC offset by the given number of hours.
-    /// The offset is clamped to the range -12 to +14 hours.
+    /// The offset wraps around from +14 to -12 (27 total values: -12 to +14).
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "Clamping prevents overflow."
+        clippy::integer_division_remainder_used,
+        reason = "Wrapping arithmetic is intentional."
     )]
     pub fn adjust_utc_offset_hours(&mut self, hours: i32) {
-        let new_offset_hours = (self.utc_offset_hours() + hours).clamp(-12, 14);
-        self.utc_offset_minutes = new_offset_hours * 60;
+        let current_offset_hours = self.utc_offset_hours();
+        let new_offset_hours = current_offset_hours + hours;
+        
+        // Wrap around: -12 to +14 (27 values)
+        // Map to 0-26 range, wrap, then map back to -12 to +14
+        let wrapped = ((new_offset_hours + 12) % 27 + 27) % 27 - 12;
+        
+        // Calculate the change in hours
+        let delta_hours = wrapped - current_offset_hours;
+        
+        // Adjust the display offset to reflect the timezone change
+        // When UTC offset increases by 1 hour, display should show 1 hour later
+        if delta_hours >= 0 {
+            self.offset += Duration::from_secs((delta_hours * 3600) as u64);
+        } else {
+            self.offset -= Duration::from_secs(((-delta_hours) * 3600) as u64);
+        }
+        
+        self.utc_offset_minutes = wrapped * 60;
         info!(
-            "Adjusted UTC offset to {} hours ({} minutes)",
-            new_offset_hours, self.utc_offset_minutes
+            "Adjusted UTC offset from {} to {} hours (delta: {} hours)",
+            current_offset_hours, wrapped, delta_hours
         );
     }
 }
