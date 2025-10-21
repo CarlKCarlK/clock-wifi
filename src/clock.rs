@@ -75,13 +75,6 @@ impl Clock<'_> {
         self.0.send(ClockNotice::SetTimeFromUnix(unix_seconds)).await;
     }
 
-    pub(crate) async fn adjust_offset(&self, delta: Duration) {
-        self.0.send(ClockNotice::AdjustClockTime(delta)).await;
-    }
-
-    pub(crate) async fn reset_seconds(&self) {
-        self.0.send(ClockNotice::ResetSeconds).await;
-    }
 
     pub(crate) async fn adjust_utc_offset_hours(&self, hours: i32) {
         self.0.send(ClockNotice::AdjustUtcOffsetHours(hours)).await;

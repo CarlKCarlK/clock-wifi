@@ -2,7 +2,19 @@
 
 [![Rust Embedded](https://img.shields.io/badge/Rust-Embedded-blue?style=flat-square)](https://www.rust-lang.org/) [![Embassy](https://img.shields.io/badge/Framework-Embassy-orange?style=flat-square)](https://embassy.dev/)
 
-A Rust-based embedded clock controlled with `Embassy`.
+A Rust-based embedded clock with WiFi time synchronization, controlled with `Embassy`.
+
+## Configuration
+
+WiFi credentials and starting timezone can be configured via environment variables or a `.env` file in the project directory (or `~/.pico.env`):
+
+```bash
+WIFI_SSID=your_network_name
+WIFI_PASS=your_password
+UTC_OFFSET_MINUTES=0  # e.g., -480 for PST (UTC-8)
+```
+
+The UTC offset can also be adjusted at runtime using the edit mode (see State Diagram below).
 
 ## Related Article
 
@@ -20,33 +32,23 @@ stateDiagram-v2
 
     style HoursMinutes fill:#000,stroke:#333,stroke-width:2px,color:#ff4444,font-family:"Courier New",font-size:18px,font-weight:bold
     style MinutesSeconds fill:#000,stroke:#333,stroke-width:2px,color:#ff4444,font-family:"Courier New",font-size:18px,font-weight:bold
-    style ShowSeconds fill:#000,stroke:#333,stroke-width:2px,color:#ff4444,font-family:"Courier New",font-size:18px,font-weight:bold
-    style ShowMinutes fill:#000,stroke:#333,stroke-width:2px,color:#ff4444,font-family:"Courier New",font-size:18px,font-weight:bold    
-    style ShowHours fill:#000,stroke:#333,stroke-width:2px,color:#ff4444,font-family:"Courier New",font-size:18px,font-weight:bold
-    
+    style EditUtcOffset fill:#000,stroke:#333,stroke-width:2px,color:#ff4444,font-family:"Courier New",font-size:18px,font-weight:bold
 
-    HoursMinutes --> MinutesSeconds : Tap
-    MinutesSeconds --> HoursMinutes : Tap
-    HoursMinutes --> ShowSeconds : Press & Release
-    MinutesSeconds --> ShowSeconds : Press & Release
-    ShowSeconds --> ShowMinutes : Tap
-    ShowSeconds --> EditSeconds : Press
-    EditSeconds --> ShowSeconds : Release
-    ShowMinutes --> ShowHours : Tap
-    ShowMinutes --> EditMinutes : Press
-    EditMinutes --> ShowMinutes : Release
-    ShowHours --> HoursMinutes : Tap
-    ShowHours --> EditHours : Press
-    EditHours --> ShowHours : Release
+    HoursMinutes --> MinutesSeconds : Short Press
+    MinutesSeconds --> HoursMinutes : Short Press
+    HoursMinutes --> EditUtcOffset : Long Press
+    MinutesSeconds --> EditUtcOffset : Long Press
+    EditUtcOffset --> EditUtcOffset : Short Press
+    EditUtcOffset --> HoursMinutes : Long Press
 
     HoursMinutes: HHMM
     MinutesSeconds: MMSS
-    state "&nbsp;&nbsp;✨SS✨&nbsp;&nbsp;" as ShowSeconds
-    EditSeconds: *to 00*
-    state "&nbsp;&nbsp;&nbsp;&nbsp;✨MM✨" as ShowMinutes    
-    EditMinutes: *increments*
-    state "✨HH✨&nbsp;&nbsp;&nbsp;&nbsp;" as ShowHours
-    EditHours: *increments*
+    state "✨±HH✨" as EditUtcOffset
+    note right of EditUtcOffset
+        Increments UTC offset
+        Range: -12 to +14
+        Wraps around
+    end note
 
 ```
 
@@ -54,25 +56,23 @@ Note: ✨ indicates blinking.
 
 ### Display Modes
 
-* `HHMM`
-* `MMSS`
+* `HHMM` - Hours and minutes (12-hour format)
+* `MMSS` - Minutes and seconds
 
-**Tap**: Switch between the two display modes.
+**Short Press**: Toggle between the two display modes.
 
-**Press & Release**: Move to the edit modes.
+**Long Press**: Enter UTC offset edit mode.
 
-### Edit Modes (blinking)
+### UTC Offset Edit Mode (blinking)
 
 <!-- markdownlint-disable MD038 -->
-* ✨` SS `✨
-* ✨`  MM`✨
-* ✨`HH  `✨
+* ✨`±HH `✨ - Shows UTC offset (e.g., `+08 `, `-05 `, ` 00 `)
 
-**Tap**: Move through the three edit modes and then return to the display modes.
+**Short Press**: Increment offset by 1 hour (wraps from +14 to -12).
 
-**Press**: Change the value. Seconds go to `00`. Minutes and hours increment quickly.
+**Long Press**: Return to `HHMM` mode with the new offset applied.
 
-**Release**: When the value is what you wish.
+**Time Sync**: NTP time synchronization events are ignored while in edit mode.
 
 ## Wiring
 
