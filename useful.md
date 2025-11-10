@@ -3,7 +3,7 @@
 ## Run
 
 ```bash
-cargo run
+cargo run --release
 ```
 
 ## Generate Documentation
